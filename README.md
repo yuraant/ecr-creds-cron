@@ -20,7 +20,7 @@ to run commands `kubectl create/delete secret` or `kubectl patch serviceaccount`
 Clone this repo first.
 
 We need to put AWS credentials and AWS account id in them in `templates/secrets.yaml`. All values should be encrypted by 
-based64.
+base64.
 
 Example value for aws region:
 ```bash
