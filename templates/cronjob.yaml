@@ -1,0 +1,54 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: ecr-cred-updater
+spec:
+  schedule: "0 */8 * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 4
+      template:
+        spec:
+          serviceAccountName: ecr-cred-updater
+          terminationGracePeriodSeconds: 0
+          restartPolicy: Never
+          containers:
+            - name: kubectl
+              image: yabramkin/aws-kubectl:latest
+              env:
+              - name: AWS_ACCESS_KEY_ID
+                valueFrom:
+                  secretKeyRef:
+                     name: ecr-cred-updater
+                     key: AWS_ACCESS_KEY_ID
+              - name: AWS_SECRET_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: ecr-cred-updater
+                    key: AWS_SECRET_ACCESS_KEY
+              - name: AWS_REGION
+                valueFrom:
+                  secretKeyRef:
+                    name: ecr-cred-updater
+                    key: AWS_REGION
+              - name: AWS_ACCOUNT
+                valueFrom:
+                  secretKeyRef:
+                    name: ecr-cred-updater
+                    key: AWS_ACCOUNT
+              command:
+                - "/bin/sh"
+                - "-c"
+                - |
+                  DOCKER_REGISTRY_SERVER=https://${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                  DOCKER_USER=AWS
+                  DOCKER_PASSWORD=`aws ecr get-login --region ${AWS_REGION} --registry-ids ${AWS_ACCOUNT} | cut -d' ' -f6`
+                  kubectl delete secret aws-registry || true
+                  kubectl create secret docker-registry aws-registry \
+                  --docker-server=$DOCKER_REGISTRY_SERVER \
+                  --docker-username=$DOCKER_USER \
+                  --docker-password=$DOCKER_PASSWORD \
+                  --docker-email=no@email.local
+                  kubectl patch serviceaccount default -p '{"imagePullSecrets":[{"name":"aws-registry"}]}'
